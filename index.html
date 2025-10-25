@@ -24,7 +24,7 @@
 
     <div class="bar">
       <div id="msg" class="msg" aria-live="polite"></div>
-      <button id="revealBtn" type="button">Reveal</button>
+      <button id="revealBtn" type="button" style="display:none">Reveal</button>
     </div>
   </div>
 
@@ -33,7 +33,7 @@
 
     const ROWS = 5, COLS = 2;
     const DEFAULT_TABLE = 7;
-    const DEBOUNCE_MS = 1000;
+    const DEBOUNCE_MS = 500;
 
     const gridEl      = document.getElementById('grid');
     const msgEl       = document.getElementById('msg');
