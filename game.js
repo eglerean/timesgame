@@ -1,20 +1,14 @@
 // game.js
-// Pure game state/logic for a 5x2 times-table guessing game with scoring.
+// Pure game logic for a 5x2 times-table guessing game with scoring
+// and dynamic difficulty (more blanks as the score increases).
 
 export class TimesTableGame {
-  /**
-   * @param {number} table - times-table base (e.g., 7)
-   * @param {number} rows
-   * @param {number} cols
-   * @param {number} blanks - how many blank (editable) cells per round
-   */
-  constructor(table = 7, rows = 5, cols = 2, blanks = 1) {
+  constructor(table = 7, rows = 5, cols = 2) {
     this.rows = rows;
     this.cols = cols;
     this.total = rows * cols;
-    this.score = 0; // cumulative “rights” counter
+    this.score = 0; // cumulative correct answers across rounds
     this.setTable(table);
-    this.setBlanks(blanks);
     this.newRound();
   }
 
@@ -23,8 +17,10 @@ export class TimesTableGame {
     this.values = Array.from({ length: this.total }, (_, i) => this.table * (i + 1));
   }
 
-  setBlanks(k) {
-    this.blanksCount = Math.max(1, Math.min(this.total, Number(k) || 1));
+  // 1 blank for score 0–5, 2 blanks for 6–10, 3 for 11–15, etc. (capped to total cells)
+  computeBlanksCount() {
+    const base = 1 + Math.floor(Math.max(0, this.score - 1) / 5);
+    return Math.min(this.total, base);
   }
 
   static #shuffle(arr) {
@@ -35,31 +31,25 @@ export class TimesTableGame {
     return arr;
   }
 
-  #pickBlankIndexes() {
+  #pickBlankIndexes(k) {
     const allIdx = Array.from({ length: this.total }, (_, i) => i);
     TimesTableGame.#shuffle(allIdx);
-    return new Set(allIdx.slice(0, this.blanksCount));
+    return new Set(allIdx.slice(0, k));
   }
 
   newRound() {
-    this.blankIndexes = this.#pickBlankIndexes(); // Set<number>
+    this.blanksCount = this.computeBlanksCount();
+    this.blankIndexes = this.#pickBlankIndexes(this.blanksCount); // Set<number>
     this.correctMap = new Map();
     for (let i = 0; i < this.total; i++) this.correctMap.set(i, null);
   }
 
-  isBlank(index) {
-    return this.blankIndexes.has(index);
-  }
-
-  getValue(index) {
-    return this.values[index];
-  }
+  isBlank(index) { return this.blankIndexes.has(index); }
+  getValue(index) { return this.values[index]; }
 
   /**
    * Check user's input for the given cell index.
    * Increments score ONLY if this cell becomes correct for the first time.
-   * @param {number} index
-   * @param {string|number} input
    * @returns {{correct: boolean, correctValue: number, scored: boolean, score: number}}
    */
   check(index, input) {
@@ -71,15 +61,13 @@ export class TimesTableGame {
     let scored = false;
 
     if (ok) {
-      // If it wasn’t already correct, mark correct and increment score
       if (prev !== true) {
         this.correctMap.set(index, true);
-        this.score += 1;
+        this.score += 1;     // rights only
         scored = true;
       }
     } else {
-      // Track wrong state but do NOT change score
-      this.correctMap.set(index, false);
+      this.correctMap.set(index, false); // track wrong, no penalty
     }
 
     return { correct: ok, correctValue, scored, score: this.score };
@@ -92,9 +80,7 @@ export class TimesTableGame {
     return true;
   }
 
-  resetScore() {
-    this.score = 0;
-  }
+  resetScore() { this.score = 0; }
 
   getState() {
     return {
@@ -106,6 +92,7 @@ export class TimesTableGame {
       blankIndexes: new Set(this.blankIndexes),
       correctMap: new Map(this.correctMap),
       score: this.score,
+      blanksCount: this.blanksCount,
     };
   }
 }

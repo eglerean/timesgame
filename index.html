@@ -3,11 +3,12 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Times Table – Base Grid (5×2)</title>
+<title>Times Table – Rectangular Grid (5×2)</title>
 <style>
   :root {
     --gap: 12px;
-    --cell-size: 64px;
+    --cell-h: 64px; /* height will be recalculated by JS */
+    --aspect: 2;    /* width / height ratio */
     --accent: #4f7cff;
     --ok: #21a179;
     --bad: #e74c3c;
@@ -58,8 +59,7 @@
   .grid {
     width: 100%;
     display: grid;
-    grid-template-columns: repeat(2, var(--cell-size));
-    grid-template-rows: repeat(5, var(--cell-size));
+    grid-template-columns: repeat(2, 1fr);
     justify-content: center;
     gap: var(--gap);
     margin: 6px auto 10px;
@@ -75,6 +75,8 @@
     box-shadow: 0 1px 0 rgba(0,0,0,0.04);
     overflow: hidden;
     transition: border-color 120ms ease, outline-color 120ms ease;
+    aspect-ratio: var(--aspect); /* width = 2×height */
+    height: var(--cell-h);
   }
 
   .cell input {
@@ -84,7 +86,7 @@
     outline: none;
     text-align: center;
     font-weight: 800;
-    font-size: clamp(18px, 7vw, 32px);
+    font-size: clamp(18px, 6vw, 28px);
     background: transparent;
     -webkit-appearance: none;
     appearance: none;
@@ -108,7 +110,7 @@
 <body>
   <div class="wrap">
     <header>
-      <h1>Times Table (5×2 grid)</h1>
+      <h1>Times Table Trainer</h1>
       <select id="tableSelect" aria-label="Choose times table">
         <option value="2">×2</option>
         <option value="3">×3</option>
@@ -124,7 +126,6 @@
       </select>
       <button id="newBtn" class="primary" type="button">New round</button>
 
-      <!-- Score badge -->
       <div class="score-badge">Score: <span id="scoreVal">0</span> ✅</div>
     </header>
 
@@ -139,199 +140,112 @@
   <script type="module">
     import { TimesTableGame } from './game.js';
 
-    // --- Config ---
     const ROWS = 5, COLS = 2;
-    const BLANKS = 1;      // number of editable blanks per round
     const DEFAULT_TABLE = 7;
     const DEBOUNCE_MS = 1000;
 
-    // --- DOM refs ---
-    const gridEl = document.getElementById('grid');
-    const msgEl = document.getElementById('msg');
+    const gridEl      = document.getElementById('grid');
+    const msgEl       = document.getElementById('msg');
     const tableSelect = document.getElementById('tableSelect');
-    const newBtn = document.getElementById('newBtn');
-    const revealBtn = document.getElementById('revealBtn');
-    const scoreValEl = document.getElementById('scoreVal');
+    const newBtn      = document.getElementById('newBtn');
+    const revealBtn   = document.getElementById('revealBtn');
+    const scoreValEl  = document.getElementById('scoreVal');
 
-    // --- Game state ---
-    let game = new TimesTableGame(DEFAULT_TABLE, ROWS, COLS, BLANKS);
+    let game = new TimesTableGame(DEFAULT_TABLE, ROWS, COLS);
 
-    // per-input debounce timers
     const timers = new WeakMap();
-    function clearTimer(inp) {
-      const t = timers.get(inp);
-      if (t) { clearTimeout(t); timers.delete(inp); }
-    }
-    function scheduleCheckForInput(inp) {
-      clearTimer(inp);
-      const id = setTimeout(() => {
-        timers.delete(inp);
-        checkOneInput(inp);
-      }, DEBOUNCE_MS);
-      timers.set(inp, id);
-    }
+    function clearTimer(inp){const t=timers.get(inp);if(t){clearTimeout(t);timers.delete(inp);}}
+    function scheduleCheckForInput(inp){clearTimer(inp);const id=setTimeout(()=>{timers.delete(inp);checkOneInput(inp);},DEBOUNCE_MS);timers.set(inp,id);}
 
-    function updateScore() {
-      const { score } = game.getState();
-      scoreValEl.textContent = String(score);
-    }
+    function updateScore(){const {score}=game.getState();scoreValEl.textContent=String(score);}
 
-    function checkOneInput(inp) {
-      const idx = Number(inp.dataset.index);
-      if (Number.isNaN(idx)) return;
-
-      const { correct, correctValue, scored } = game.check(idx, inp.value);
-      const cell = inp.parentElement;
-      cell.classList.remove('ok', 'wrong');
-
-      if (correct) {
+    function checkOneInput(inp){
+      const idx=Number(inp.dataset.index);
+      if(Number.isNaN(idx))return;
+      const {correct,correctValue}=game.check(idx,inp.value);
+      const cell=inp.parentElement;
+      cell.classList.remove('ok','wrong');
+      if(correct){
         cell.classList.add('ok');
-        inp.value = String(correctValue);
-        inp.readOnly = true;
-        inp.tabIndex = -1;
+        inp.value=String(correctValue);
+        inp.readOnly=true;inp.tabIndex=-1;
         cell.classList.remove('blank');
-        if (scored) updateScore();
-        announce('Great! ✅', 'good');
-
-        if (game.isRoundComplete()) {
-          announce('All correct! New round… 🎉', 'good');
-          setTimeout(() => {
-            game.newRound();
-            renderGrid();
-            resizeGrid();
-            announce('');
-          }, 600);
+        announce('Great! ✅','good');
+        if(game.isRoundComplete()){
+          game.completeRound();
+          updateScore();
+          announce('Level complete! New round… 🎉','good');
+          setTimeout(()=>{game.newRound();renderGrid();resizeGrid();announce('');},600);
         }
-      } else {
-        if (String(inp.value).trim().length > 0) {
-          cell.classList.add('wrong');
-          announce('Keep trying!', 'bad');
-        } else {
-          announce('');
-        }
+      }else{
+        if(String(inp.value).trim().length>0){cell.classList.add('wrong');announce('Keep trying!','bad');}
+        else announce('');
       }
     }
 
-    function renderGrid() {
-      const { values, blankIndexes, correctMap } = game.getState();
-      gridEl.innerHTML = '';
-
-      for (let i = 0; i < values.length; i++) {
-        const cell = document.createElement('div');
-        cell.className = 'cell';
-
-        const inp = document.createElement('input');
-        inp.type = 'tel';
-        inp.inputMode = 'numeric';
-        inp.autocomplete = 'one-time-code';
-
-        if (blankIndexes.has(i)) {
+    function renderGrid(){
+      const {values,blankIndexes,correctMap}=game.getState();
+      gridEl.innerHTML='';
+      for(let i=0;i<values.length;i++){
+        const cell=document.createElement('div');cell.className='cell';
+        const inp=document.createElement('input');
+        inp.type='tel';inp.inputMode='numeric';inp.autocomplete='one-time-code';
+        if(blankIndexes.has(i)){
           cell.classList.add('blank');
-          inp.value = '';
-          inp.placeholder = '?';
-          inp.dataset.index = String(i);
-
-          inp.addEventListener('input', () => scheduleCheckForInput(inp));
-          inp.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              clearTimer(inp);
-              checkOneInput(inp);
-            }
-          });
-          inp.addEventListener('blur', () => {
-            clearTimer(inp);
-            if (!inp.readOnly && inp.value.trim() !== '') checkOneInput(inp);
-          });
-
-          if (!gridEl.querySelector('.blank input')) {
-            setTimeout(() => inp.focus({ preventScroll: true }), 0);
-          }
-        } else {
+          inp.value='';inp.placeholder='?';inp.dataset.index=String(i);
+          inp.addEventListener('input',()=>scheduleCheckForInput(inp));
+          inp.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();clearTimer(inp);checkOneInput(inp);}});
+          inp.addEventListener('blur',()=>{clearTimer(inp);if(!inp.readOnly&&inp.value.trim()!=='')checkOneInput(inp);});
+          if(!gridEl.querySelector('.blank input')) setTimeout(()=>inp.focus({preventScroll:true}),0);
+        }else{
           cell.classList.add('readonly');
-          inp.value = String(values[i]);
-          inp.readOnly = true;
-          inp.tabIndex = -1;
+          inp.value=String(values[i]);inp.readOnly=true;inp.tabIndex=-1;
         }
-
-        const status = correctMap.get(i);
-        if (status === true) cell.classList.add('ok');
-        if (status === false) cell.classList.add('wrong');
-
+        const status=correctMap.get(i);
+        if(status===true)cell.classList.add('ok');
+        if(status===false)cell.classList.add('wrong');
         cell.appendChild(inp);
         gridEl.appendChild(cell);
       }
     }
 
-    function announce(text, type) {
-      msgEl.textContent = text;
-      if (type === 'good') msgEl.style.color = 'var(--ok)';
-      else if (type === 'bad') msgEl.style.color = 'var(--bad)';
-      else msgEl.style.color = '#111';
+    function announce(text,type){
+      if(!msgEl)return;
+      msgEl.textContent=text;
+      msgEl.style.color=type==='good'?'var(--ok)':type==='bad'?'var(--bad)':'#111';
     }
 
-    function resizeGrid() {
-      const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap')) || 12;
-      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-      const targetH = Math.floor(vh * 0.5);
-      const maxByH = Math.floor((targetH - gap * (ROWS - 1)) / ROWS);
-
-      const rect = gridEl.getBoundingClientRect();
-      const w = rect.width || document.body.clientWidth;
-      const maxByW = Math.floor((w - gap * (COLS - 1)) / COLS);
-
-      const size = Math.max(44, Math.min(maxByH, maxByW));
-      gridEl.style.setProperty('--cell-size', size + 'px');
-
-      const totalH = size * ROWS + gap * (ROWS - 1);
-      gridEl.style.height = totalH + 'px';
+    // Adjust height so grid fits half of viewport; rectangles 2× width/height ratio
+    function resizeGrid(){
+      const gap=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap'))||12;
+      const vh=window.visualViewport?window.visualViewport.height:window.innerHeight;
+      const targetH=Math.floor(vh*0.5);
+      const cellH=Math.floor((targetH-gap*(ROWS-1))/ROWS);
+      gridEl.style.setProperty('--cell-h',cellH+'px');
     }
 
-    function revealAnswers() {
-      const { values, blankIndexes } = game.getState();
-      blankIndexes.forEach(idx => {
-        const cell = gridEl.children[idx];
-        const inp = cell.querySelector('input');
-        if (inp) {
-          clearTimer(inp);
-          inp.value = values[idx];
-          inp.readOnly = true;
-          inp.tabIndex = -1;
-          cell.classList.remove('blank', 'wrong');
-          cell.classList.add('ok');
-        }
+    function revealAnswers(){
+      const {values,blankIndexes}=game.getState();
+      blankIndexes.forEach(idx=>{
+        const cell=gridEl.children[idx];
+        const inp=cell.querySelector('input');
+        if(inp){clearTimer(inp);inp.value=values[idx];inp.readOnly=true;inp.tabIndex=-1;
+          cell.classList.remove('blank','wrong');cell.classList.add('ok');}
       });
-      announce('Shown the answers. Try a new round!', 'good');
-      // No score change for reveals
+      announce('Shown the answers. Try a new round!','good');
     }
 
-    // Events
-    tableSelect.addEventListener('change', () => {
-      game.setTable(Number(tableSelect.value));
-      game.newRound();
-      renderGrid();
-      resizeGrid();
-      announce('');
-    });
+    function on(el,evt,fn){if(el)el.addEventListener(evt,fn);}
+    on(tableSelect,'change',()=>{game.setTable(Number(tableSelect.value));game.newRound();renderGrid();resizeGrid();announce('');});
+    on(newBtn,'click',()=>{game.newRound();renderGrid();resizeGrid();announce('');});
+    on(revealBtn,'click',revealAnswers);
 
-    newBtn.addEventListener('click', () => {
-      game.newRound();
-      renderGrid();
-      resizeGrid();
-      announce('');
-    });
+    window.addEventListener('resize',resizeGrid);
+    if(window.visualViewport)window.visualViewport.addEventListener('resize',resizeGrid);
 
-    revealBtn.addEventListener('click', revealAnswers);
-
-    window.addEventListener('resize', resizeGrid);
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', resizeGrid);
-    }
-
-    // Initial paint
     renderGrid();
     requestAnimationFrame(resizeGrid);
-    updateScore(); // show starting score (0)
+    updateScore();
   </script>
 </body>
 </html>
