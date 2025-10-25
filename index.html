@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Times Table – Base Grid (5×2)</title>
+<style>
+  :root {
+    --gap: 12px;
+    --cell-size: 64px;
+    --accent: #4f7cff;
+    --ok: #21a179;
+    --bad: #e74c3c;
+    --bg: #f7f8fb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: #111;
+  }
+
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  }
+
+  header {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  h1 { font-size: 1.05rem; margin: 0; font-weight: 700; }
+  select, button {
+    font-size: 1rem;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid #d7dbe5;
+    background: #fff;
+  }
+  button.primary { background: var(--accent); color: #fff; border: none; }
+
+  .grid {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, var(--cell-size));
+    grid-template-rows: repeat(5, var(--cell-size));
+    justify-content: center;
+    gap: var(--gap);
+    margin: 6px auto 10px;
+    touch-action: manipulation;
+  }
+
+  .cell {
+    display: grid;
+    place-items: center;
+    border-radius: 14px;
+    background: #fff;
+    border: 2px solid #e6e8ee;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+    overflow: hidden;
+    transition: border-color 120ms ease, outline-color 120ms ease;
+  }
+
+  .cell input {
+    width: 100%;
+    height: 100%;
+    border: none;
+    outline: none;
+    text-align: center;
+    font-weight: 800;
+    font-size: clamp(18px, 7vw, 32px);
+    background: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+    caret-color: var(--accent);
+  }
+
+  .cell.readonly { border-color: #e6e8ee; }
+  .cell.blank    { outline: 3px dashed rgba(79,124,255,0.55); outline-offset: -6px; }
+  .cell.ok    { border-color: var(--ok); outline: 3px solid rgba(33,161,121,0.25); outline-offset: -6px; }
+  .cell.wrong { border-color: var(--bad); }
+
+  .bar {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 8px;
+  }
+  .msg { min-height: 1.4em; font-size: 0.95rem; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Times Table (5×2 grid)</h1>
+      <select id="tableSelect" aria-label="Choose times table">
+        <option value="2">×2</option>
+        <option value="3">×3</option>
+        <option value="4">×4</option>
+        <option value="5">×5</option>
+        <option value="6">×6</option>
+        <option value="7" selected>×7</option>
+        <option value="8">×8</option>
+        <option value="9">×9</option>
+        <option value="10">×10</option>
+        <option value="11">×11</option>
+        <option value="12">×12</option>
+      </select>
+      <button id="newBtn" class="primary" type="button">New round</button>
+    </header>
+
+    <div id="grid" class="grid" role="group" aria-label="Times table inputs"></div>
+
+    <div class="bar">
+      <div id="msg" class="msg" aria-live="polite"></div>
+      <button id="revealBtn" type="button">Reveal</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { TimesTableGame } from './game.js';
+
+    // --- Config ---
+    const ROWS = 5, COLS = 2;
+    const BLANKS = 1;      // number of editable blanks per round
+    const DEFAULT_TABLE = 7;
+    const DEBOUNCE_MS = 1000;
+
+    // --- DOM refs ---
+    const gridEl = document.getElementById('grid');
+    const msgEl = document.getElementById('msg');
+    const tableSelect = document.getElementById('tableSelect');
+    const newBtn = document.getElementById('newBtn');
+    const revealBtn = document.getElementById('revealBtn');
+
+    // --- Game state ---
+    let game = new TimesTableGame(DEFAULT_TABLE, ROWS, COLS, BLANKS);
+
+    // Keep a per-input debounce timer
+    const timers = new WeakMap(); // input -> timeout id
+
+    function clearTimer(inp) {
+      const t = timers.get(inp);
+      if (t) {
+        clearTimeout(t);
+        timers.delete(inp);
+      }
+    }
+
+    function scheduleCheckForInput(inp) {
+      clearTimer(inp);
+      const id = setTimeout(() => {
+        timers.delete(inp);
+        checkOneInput(inp);
+      }, DEBOUNCE_MS);
+      timers.set(inp, id);
+    }
+
+    function checkOneInput(inp) {
+      const idx = Number(inp.dataset.index);
+      if (Number.isNaN(idx)) return;
+
+      const { correct, correctValue } = game.check(idx, inp.value);
+      const cell = inp.parentElement;
+      cell.classList.remove('ok', 'wrong');
+
+      if (correct) {
+        // Lock this cell and mark OK
+        cell.classList.add('ok');
+        inp.value = String(correctValue);
+        inp.readOnly = true;
+        inp.tabIndex = -1;
+        cell.classList.remove('blank');
+        announce('Great! ✅', 'good');
+
+        // If all blanks correct, start a new round
+        if (game.isRoundComplete()) {
+          announce('All correct! New round… 🎉', 'good');
+          setTimeout(() => {
+            game.newRound();
+            renderGrid();
+            resizeGrid();
+            announce('');
+          }, 600);
+        }
+      } else {
+        // Only mark wrong if there is at least one char typed;
+        // this avoids showing red on empty input.
+        if (String(inp.value).trim().length > 0) {
+          cell.classList.add('wrong');
+          announce('Keep trying!', 'bad');
+        } else {
+          announce('');
+        }
+      }
+    }
+
+    // Render all cells (inputs; some readonly and filled, some blank/editable)
+    function renderGrid() {
+      const { values, blankIndexes, correctMap } = game.getState();
+      gridEl.innerHTML = '';
+
+      for (let i = 0; i < values.length; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+
+        const inp = document.createElement('input');
+        inp.type = 'tel';
+        inp.inputMode = 'numeric';
+        inp.autocomplete = 'one-time-code';
+
+        if (blankIndexes.has(i)) {
+          cell.classList.add('blank');
+          inp.value = '';
+          inp.placeholder = '?';
+          inp.dataset.index = String(i);
+
+          // Debounced auto-check: run 1s after the last keystroke
+          inp.addEventListener('input', () => scheduleCheckForInput(inp));
+
+          // Also check on Enter immediately
+          inp.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              clearTimer(inp);
+              checkOneInput(inp);
+            }
+          });
+
+          // And on blur (if they navigate away)
+          inp.addEventListener('blur', () => {
+            clearTimer(inp);
+            if (!inp.readOnly && inp.value.trim() !== '') checkOneInput(inp);
+          });
+
+          // Autofocus the first blank
+          if (!gridEl.querySelector('.blank input')) {
+            setTimeout(() => inp.focus({ preventScroll: true }), 0);
+          }
+        } else {
+          cell.classList.add('readonly');
+          inp.value = String(values[i]);
+          inp.readOnly = true;
+          inp.tabIndex = -1;
+        }
+
+        // reflect correctness state if any (typically none on round start)
+        const status = correctMap.get(i);
+        if (status === true) cell.classList.add('ok');
+        if (status === false) cell.classList.add('wrong');
+
+        cell.appendChild(inp);
+        gridEl.appendChild(cell);
+      }
+    }
+
+    function announce(text, type) {
+      msgEl.textContent = text;
+      if (type === 'good') msgEl.style.color = 'var(--ok)';
+      else if (type === 'bad') msgEl.style.color = 'var(--bad)';
+      else msgEl.style.color = '#111';
+    }
+
+    // Ensure grid ~half of visible viewport height (keyboard-aware)
+    function resizeGrid() {
+      const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap')) || 12;
+      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      const targetH = Math.floor(vh * 0.5);
+      const maxByH = Math.floor((targetH - gap * (ROWS - 1)) / ROWS);
+
+      const rect = gridEl.getBoundingClientRect();
+      const w = rect.width || document.body.clientWidth;
+      const maxByW = Math.floor((w - gap * (COLS - 1)) / COLS);
+
+      const size = Math.max(44, Math.min(maxByH, maxByW));
+      gridEl.style.setProperty('--cell-size', size + 'px');
+
+      const totalH = size * ROWS + gap * (ROWS - 1);
+      gridEl.style.height = totalH + 'px';
+    }
+
+    function revealAnswers() {
+      const { values, blankIndexes } = game.getState();
+      blankIndexes.forEach(idx => {
+        const cell = gridEl.children[idx];
+        const inp = cell.querySelector('input');
+        if (inp) {
+          clearTimer(inp);
+          inp.value = values[idx];
+          inp.readOnly = true;
+          inp.tabIndex = -1;
+          cell.classList.remove('blank', 'wrong');
+          cell.classList.add('ok');
+        }
+      });
+      announce('Shown the answers. Try a new round!', 'good');
+    }
+
+    // Event wiring
+    tableSelect.addEventListener('change', () => {
+      game.setTable(Number(tableSelect.value));
+      game.newRound();
+      renderGrid();
+      resizeGrid();
+      announce('');
+    });
+
+    newBtn.addEventListener('click', () => {
+      game.newRound();
+      renderGrid();
+      resizeGrid();
+      announce('');
+    });
+
+    revealBtn.addEventListener('click', revealAnswers);
+
+    window.addEventListener('resize', resizeGrid);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', resizeGrid);
+    }
+
+    // Initial paint
+    renderGrid();
+    requestAnimationFrame(resizeGrid);
+  </script>
+</body>
+</html>
+
