@@ -44,6 +44,17 @@
   }
   button.primary { background: var(--accent); color: #fff; border: none; }
 
+  .score-badge {
+    grid-column: 1 / -1;
+    justify-self: start;
+    margin-top: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: #ffffff;
+    border: 1px solid #e6e8ee;
+    font-weight: 700;
+  }
+
   .grid {
     width: 100%;
     display: grid;
@@ -112,6 +123,9 @@
         <option value="12">×12</option>
       </select>
       <button id="newBtn" class="primary" type="button">New round</button>
+
+      <!-- Score badge -->
+      <div class="score-badge">Score: <span id="scoreVal">0</span> ✅</div>
     </header>
 
     <div id="grid" class="grid" role="group" aria-label="Times table inputs"></div>
@@ -137,21 +151,17 @@
     const tableSelect = document.getElementById('tableSelect');
     const newBtn = document.getElementById('newBtn');
     const revealBtn = document.getElementById('revealBtn');
+    const scoreValEl = document.getElementById('scoreVal');
 
     // --- Game state ---
     let game = new TimesTableGame(DEFAULT_TABLE, ROWS, COLS, BLANKS);
 
-    // Keep a per-input debounce timer
-    const timers = new WeakMap(); // input -> timeout id
-
+    // per-input debounce timers
+    const timers = new WeakMap();
     function clearTimer(inp) {
       const t = timers.get(inp);
-      if (t) {
-        clearTimeout(t);
-        timers.delete(inp);
-      }
+      if (t) { clearTimeout(t); timers.delete(inp); }
     }
-
     function scheduleCheckForInput(inp) {
       clearTimer(inp);
       const id = setTimeout(() => {
@@ -161,24 +171,28 @@
       timers.set(inp, id);
     }
 
+    function updateScore() {
+      const { score } = game.getState();
+      scoreValEl.textContent = String(score);
+    }
+
     function checkOneInput(inp) {
       const idx = Number(inp.dataset.index);
       if (Number.isNaN(idx)) return;
 
-      const { correct, correctValue } = game.check(idx, inp.value);
+      const { correct, correctValue, scored } = game.check(idx, inp.value);
       const cell = inp.parentElement;
       cell.classList.remove('ok', 'wrong');
 
       if (correct) {
-        // Lock this cell and mark OK
         cell.classList.add('ok');
         inp.value = String(correctValue);
         inp.readOnly = true;
         inp.tabIndex = -1;
         cell.classList.remove('blank');
+        if (scored) updateScore();
         announce('Great! ✅', 'good');
 
-        // If all blanks correct, start a new round
         if (game.isRoundComplete()) {
           announce('All correct! New round… 🎉', 'good');
           setTimeout(() => {
@@ -189,8 +203,6 @@
           }, 600);
         }
       } else {
-        // Only mark wrong if there is at least one char typed;
-        // this avoids showing red on empty input.
         if (String(inp.value).trim().length > 0) {
           cell.classList.add('wrong');
           announce('Keep trying!', 'bad');
@@ -200,7 +212,6 @@
       }
     }
 
-    // Render all cells (inputs; some readonly and filled, some blank/editable)
     function renderGrid() {
       const { values, blankIndexes, correctMap } = game.getState();
       gridEl.innerHTML = '';
@@ -220,10 +231,7 @@
           inp.placeholder = '?';
           inp.dataset.index = String(i);
 
-          // Debounced auto-check: run 1s after the last keystroke
           inp.addEventListener('input', () => scheduleCheckForInput(inp));
-
-          // Also check on Enter immediately
           inp.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
               e.preventDefault();
@@ -231,14 +239,11 @@
               checkOneInput(inp);
             }
           });
-
-          // And on blur (if they navigate away)
           inp.addEventListener('blur', () => {
             clearTimer(inp);
             if (!inp.readOnly && inp.value.trim() !== '') checkOneInput(inp);
           });
 
-          // Autofocus the first blank
           if (!gridEl.querySelector('.blank input')) {
             setTimeout(() => inp.focus({ preventScroll: true }), 0);
           }
@@ -249,7 +254,6 @@
           inp.tabIndex = -1;
         }
 
-        // reflect correctness state if any (typically none on round start)
         const status = correctMap.get(i);
         if (status === true) cell.classList.add('ok');
         if (status === false) cell.classList.add('wrong');
@@ -266,7 +270,6 @@
       else msgEl.style.color = '#111';
     }
 
-    // Ensure grid ~half of visible viewport height (keyboard-aware)
     function resizeGrid() {
       const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap')) || 12;
       const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
@@ -299,9 +302,10 @@
         }
       });
       announce('Shown the answers. Try a new round!', 'good');
+      // No score change for reveals
     }
 
-    // Event wiring
+    // Events
     tableSelect.addEventListener('change', () => {
       game.setTable(Number(tableSelect.value));
       game.newRound();
@@ -327,6 +331,7 @@
     // Initial paint
     renderGrid();
     requestAnimationFrame(resizeGrid);
+    updateScore(); // show starting score (0)
   </script>
 </body>
 </html>
