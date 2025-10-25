@@ -196,3 +196,71 @@ div#fx {
   to   { filter: brightness(1); }
 }
 
+
+/* ===== Baby pink background ===== */
+body {
+  /* soft baby-pink gradient */
+  background:
+    radial-gradient(1200px 600px at 10% -10%, #fff0f6 0%, transparent 60%),
+    radial-gradient(1200px 600px at 110% 0%, #ffeaf4 0%, transparent 60%),
+    linear-gradient(#fff5fa, #ffeaf4);
+}
+
+/* optional super subtle sprinkle pattern on the page */
+.wrap::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(255, 192, 203, 0.08) 2px, transparent 3px),
+    radial-gradient(circle at 70% 60%, rgba(255, 182, 193, 0.08) 2px, transparent 3px),
+    radial-gradient(circle at 40% 80%, rgba(255, 160, 180, 0.07) 2px, transparent 3px);
+  background-size: 160px 160px, 200px 200px, 180px 180px;
+  z-index: 0;
+}
+
+/* lift main content above the sprinkle layer */
+.wrap { position: relative; z-index: 1; }
+
+/* ===== Cute ribbon on top ===== */
+.cute-bar {
+  grid-column: 1 / -1;          /* span full header width */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+
+  padding: 8px 12px;
+  margin-bottom: 8px;
+
+  background: #fff7fb;          /* very light pink */
+  border: 2px dashed #ffcfe3;
+  color: #d87093;
+
+  border-radius: 14px;          /* round the ribbon only */
+  box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+}
+
+.cute-bar .emoji {
+  font-size: clamp(18px, 4.5vw, 22px);
+  animation: floatY 3.2s ease-in-out infinite;
+  will-change: transform;
+}
+
+.cute-bar .emoji:nth-child(2) { animation-duration: 3.5s; }
+.cute-bar .emoji:nth-child(3) { animation-duration: 3.0s; }
+.cute-bar .emoji:nth-child(4) { animation-duration: 3.8s; }
+.cute-bar .emoji:nth-child(5) { animation-duration: 3.3s; }
+
+@keyframes floatY {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50%      { transform: translateY(-4px) rotate(3deg); }
+}
+
+/* (tiny touch) make the score badge match the theme a bit more */
+.score-badge {
+  background: #fff7fb;
+  border-color: #ffd7ea;
+}
+
