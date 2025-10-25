@@ -76,9 +76,10 @@ button.primary {
 
 /* cells (rectangular, no rounded corners) */
 .cell {
-  display: grid;
-  place-items: center;
-  border-radius: 0; /* flat corners */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 0;
   background: #fff;
   border: 2px solid #e6e8ee;
   box-shadow: 0 1px 0 rgba(0,0,0,0.04);
@@ -86,10 +87,23 @@ button.primary {
   transition: border-color 120ms ease, outline-color 120ms ease;
   aspect-ratio: var(--aspect);
   height: var(--cell-h);
+  padding: 0 8px;
 }
 
+/* operation label */
+.cell .label {
+  flex: 0 0 auto;
+  font-size: clamp(10px, 3vw, 14px);
+  color: #444;
+  font-weight: 600;
+  white-space: nowrap;
+  margin-right: 6px;
+  position: absolute;
+}
+
+/* input stretches to fill remaining width */
 .cell input {
-  width: 100%;
+  flex: 1 1 auto;
   height: 100%;
   border: none;
   outline: none;
