@@ -136,3 +136,63 @@ button.primary { background: var(--accent); color: #fff; border: none; }
 }
 .msg { min-height: 1.4em; font-size: 0.95rem; }
 
+/* ===== Confetti FX ===== */
+
+div#fx {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 999; /* above the grid */
+  contain: layout style paint;
+}
+
+.confetti {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--w, 8px);
+  height: var(--h, 14px);
+  background: var(--c, #ff3b3b);
+  transform: translate3d(calc(var(--x) * 1px), calc(var(--y) * 1px), 0) rotate(var(--r0, 0deg));
+  transform-origin: center;
+  will-change: transform, opacity;
+  opacity: 0.95;
+  /* subtle depth/shadow */
+  box-shadow: 0 1px 0 rgba(0,0,0,0.06);
+  animation:
+    confetti-burst var(--dur, 900ms) cubic-bezier(.15,.75,.25,1) forwards,
+    confetti-rotate var(--spin, 700ms) linear infinite;
+}
+
+/* tiny triangles for variety (some pieces get this class) */
+.confetti.tri {
+  width: 0;
+  height: 0;
+  background: transparent;
+  border-left: calc(var(--w, 10px) / 2) solid transparent;
+  border-right: calc(var(--w, 10px) / 2) solid transparent;
+  border-bottom: var(--h, 12px) solid var(--c, #ff3b3b);
+  box-shadow: none;
+}
+
+@keyframes confetti-burst {
+  0% {
+    transform: translate3d(calc(var(--x0) * 1px), calc(var(--y0) * 1px), 0) rotate(var(--r0, 0deg)) scale(0.8);
+    opacity: 1;
+  }
+  70% {
+    transform: translate3d(calc(var(--x) * 1px), calc(var(--y) * 1px), 0) rotate(var(--r1, 180deg)) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(calc(var(--x) * 1px), calc((var(--y) + var(--g, 80)) * 1px), 0) rotate(var(--r2, 320deg)) scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes confetti-rotate {
+  from { filter: brightness(1); }
+  50%  { filter: brightness(1.15); }
+  to   { filter: brightness(1); }
+}
+
