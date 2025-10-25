@@ -1,17 +1,21 @@
 :root {
-  /* layout params */
+  /* grid geometry */
   --rows: 5;
   --cols: 2;
   --gap: 12px;
-  --pad: 16px;     /* matches .wrap horizontal padding */
-  --aspect: 4;     /* width = 3 × height */
+  --pad: 16px;
+  --aspect: 3;    /* width = 3 × height */
 
-  /* compute cell height purely in CSS (no JS):
-     - vertical limit: half of the *dynamic* viewport height (accounts for iOS UI changes)
-     - horizontal limit: make two cells + one gap fit the viewport width inside padding
-     - choose the smaller of the two, then clamp to sensible min/max
-  */
-  --h-by-viewport: calc((50dvh - (var(--rows) - 1) * var(--gap)) / var(--rows));
+  /* use large-viewport height so keyboard doesn't resize cells on iOS */
+  --vh-portion: 50dvh; /* fallback */
+}
+@supports (height: 1lvh) {
+  :root { --vh-portion: 50lvh; } /* stable when keyboard appears */
+}
+
+:root {
+  /* purely CSS sizing; JS never touches layout */
+  --h-by-viewport: calc((var(--vh-portion) - (var(--rows) - 1) * var(--gap)) / var(--rows));
   --h-by-width:    calc((100vw - var(--pad) * 2 - (var(--cols) - 1) * var(--gap)) / var(--cols) / var(--aspect));
   --cell-h: clamp(56px, min(var(--h-by-viewport), var(--h-by-width)), 120px);
 
@@ -44,12 +48,7 @@ header {
   gap: 8px;
   margin-bottom: 10px;
 }
-
-h1 {
-  font-size: 1.05rem;
-  margin: 0;
-  font-weight: 700;
-}
+h1 { font-size: 1.05rem; margin: 0; font-weight: 700; }
 
 select, button {
   font-size: 1rem;
@@ -58,12 +57,7 @@ select, button {
   border: 1px solid #d7dbe5;
   background: #fff;
 }
-
-button.primary {
-  background: var(--accent);
-  color: #fff;
-  border: none;
-}
+button.primary { background: var(--accent); color: #fff; border: none; }
 
 .score-badge {
   grid-column: 1 / -1;
@@ -76,7 +70,7 @@ button.primary {
   font-weight: 700;
 }
 
-/* grid layout (fixed by CSS only) */
+/* fixed-size grid via CSS only */
 .grid {
   display: grid;
   grid-template-columns: repeat(var(--cols), max-content);
@@ -86,25 +80,24 @@ button.primary {
   touch-action: manipulation;
 }
 
-/* cells: rectangles (no rounded corners), sized by CSS only */
+/* rectangular cells, no rounded corners */
 .cell {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-radius: 0; /* flat corners */
+  border-radius: 0;
   background: #fff;
   border: 2px solid #e6e8ee;
   box-shadow: 0 1px 0 rgba(0,0,0,0.04);
   overflow: hidden;
   transition: border-color 120ms ease, outline-color 120ms ease;
 
-  /* fixed sizing: width = 3 × height, all via CSS */
   height: var(--cell-h);
   width: calc(var(--cell-h) * var(--aspect));
   padding: 0 8px;
 }
 
-/* operation label on the left */
+/* op label on the left */
 .cell .label {
   flex: 0 0 auto;
   font-size: clamp(10px, 3vw, 14px);
@@ -114,7 +107,7 @@ button.primary {
   margin-right: 6px;
 }
 
-/* input stretches to fill remaining width */
+/* big number/input on the right */
 .cell input {
   flex: 1 1 auto;
   height: 100%;
@@ -141,9 +134,5 @@ button.primary {
   align-items: center;
   gap: 8px;
 }
-
-.msg {
-  min-height: 1.4em;
-  font-size: 0.95rem;
-}
+.msg { min-height: 1.4em; font-size: 0.95rem; }
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Times Table Trainer (Rectangles)</title>
+<title>Times Table Trainer</title>
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -11,20 +11,12 @@
     <header>
       <h1>Times Table Trainer</h1>
       <select id="tableSelect" aria-label="Choose times table">
-        <option value="2">×2</option>
-        <option value="3">×3</option>
-        <option value="4">×4</option>
-        <option value="5">×5</option>
-        <option value="6">×6</option>
-        <option value="7" selected>×7</option>
-        <option value="8">×8</option>
-        <option value="9">×9</option>
-        <option value="10">×10</option>
-        <option value="11">×11</option>
-        <option value="12">×12</option>
+        <option value="2">×2</option><option value="3">×3</option><option value="4">×4</option>
+        <option value="5">×5</option><option value="6">×6</option><option value="7" selected>×7</option>
+        <option value="8">×8</option><option value="9">×9</option><option value="10">×10</option>
+        <option value="11">×11</option><option value="12">×12</option>
       </select>
       <button id="newBtn" class="primary" type="button">New round</button>
-
       <div class="score-badge">Score: <span id="scoreVal">0</span> ✅</div>
     </header>
 
@@ -36,113 +28,167 @@
     </div>
   </div>
 
-<script type="module">
-  import { TimesTableGame } from './game.js';
+  <script type="module">
+    import { TimesTableGame } from './game.js';
 
-  const ROWS = 5, COLS = 2;
-  const DEFAULT_TABLE = 7;
-  const DEBOUNCE_MS = 1000;
+    const ROWS = 5, COLS = 2;
+    const DEFAULT_TABLE = 7;
+    const DEBOUNCE_MS = 1000;
 
-  const gridEl      = document.getElementById('grid');
-  const msgEl       = document.getElementById('msg');
-  const tableSelect = document.getElementById('tableSelect');
-  const newBtn      = document.getElementById('newBtn');
-  const revealBtn   = document.getElementById('revealBtn');
-  const scoreValEl  = document.getElementById('scoreVal');
+    const gridEl      = document.getElementById('grid');
+    const msgEl       = document.getElementById('msg');
+    const tableSelect = document.getElementById('tableSelect');
+    const newBtn      = document.getElementById('newBtn');
+    const revealBtn   = document.getElementById('revealBtn');
+    const scoreValEl  = document.getElementById('scoreVal');
 
-  let game = new TimesTableGame(DEFAULT_TABLE, ROWS, COLS);
+    let game = new TimesTableGame(DEFAULT_TABLE, ROWS, COLS);
 
-  const timers = new WeakMap();
-  function clearTimer(inp){const t=timers.get(inp);if(t){clearTimeout(t);timers.delete(inp);}}
-  function scheduleCheckForInput(inp){clearTimer(inp);const id=setTimeout(()=>{timers.delete(inp);checkOneInput(inp);},DEBOUNCE_MS);timers.set(inp,id);}
+    // Track pending blanks for the current round (UI-level, robust)
+    let pendingBlanks = 0;
 
-  function updateScore(){scoreValEl.textContent=String(game.getState().score);}
+    /* --- debounce helpers --- */
+    const timers = new WeakMap();
+    function clearTimer(inp){ const t = timers.get(inp); if (t){ clearTimeout(t); timers.delete(inp);} }
+    function scheduleCheckForInput(inp){ clearTimer(inp); const id = setTimeout(()=>{ timers.delete(inp); checkOneInput(inp); }, DEBOUNCE_MS); timers.set(inp,id); }
+    function clearAllDebounceTimers(){ gridEl.querySelectorAll('.blank input').forEach(clearTimer); }
 
-  function checkOneInput(inp){
-    const idx=Number(inp.dataset.index);
-    if(Number.isNaN(idx))return;
-    const {correct,correctValue}=game.check(idx,inp.value);
-    const cell=inp.parentElement;
-    cell.classList.remove('ok','wrong');
-    if(correct){
-      cell.classList.add('ok');
-      inp.value=String(correctValue);
-      inp.readOnly=true;inp.tabIndex=-1;
-      cell.classList.remove('blank');
-      announce('Great! ✅','good');
-      if(game.isRoundComplete()){
-        game.completeRound();
-        updateScore();
-        announce('Level complete! 🎉','good');
-        setTimeout(()=>{game.newRound();renderGrid();announce('');},600);
-      }
-    }else{
-      if(String(inp.value).trim().length>0){cell.classList.add('wrong');announce('Keep trying!','bad');}
-      else announce('');
+    function updateScore(){ scoreValEl.textContent = String(game.getState().score); }
+
+    function startNewRoundUI() {
+      // re-render and reset pendingBlanks based on current game's blankIndexes
+      const st = game.getState();
+      pendingBlanks = st.blankIndexes.size;
+      renderGrid();
     }
-  }
 
-  function renderGrid(){
-    const {values,blankIndexes,correctMap,table}=game.getState();
-    gridEl.innerHTML='';
-    for(let i=0;i<values.length;i++){
-      const cell=document.createElement('div');cell.className='cell';
-
-      // Operation label: "n × table ="
-      const label=document.createElement('span');
-      label.className='label';
-      label.textContent=`${i+1} × ${table} =`;
-      cell.appendChild(label);
-
-      const inp=document.createElement('input');
-      inp.type='tel';inp.inputMode='numeric';inp.autocomplete='one-time-code';
-
-      if(blankIndexes.has(i)){
-        cell.classList.add('blank');
-        inp.value='';inp.placeholder='?';inp.dataset.index=String(i);
-        inp.addEventListener('input',()=>scheduleCheckForInput(inp));
-        inp.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();clearTimer(inp);checkOneInput(inp);}});
-        inp.addEventListener('blur',()=>{clearTimer(inp);if(!inp.readOnly&&inp.value.trim()!=='')checkOneInput(inp);});
-        if(!gridEl.querySelector('.blank input')) setTimeout(()=>inp.focus({preventScroll:true}),0);
-      }else{
-        cell.classList.add('readonly');
-        inp.value=String(values[i]);inp.readOnly=true;inp.tabIndex=-1;
-      }
-
-      const status=correctMap.get(i);
-      if(status===true)cell.classList.add('ok');
-      if(status===false)cell.classList.add('wrong');
-
-      cell.appendChild(inp);
-      gridEl.appendChild(cell);
+    function advanceRoundNow(){
+      clearAllDebounceTimers();
+      game.completeRound();      // +1 per completed level
+      updateScore();
+      announce('Level complete! 🎉','good');
+      game.newRound();           // difficulty may increase here
+      startNewRoundUI();         // reset pending blanks & re-render
+      announce('');
     }
-  }
 
-  function announce(text,type){
-    if(!msgEl)return;
-    msgEl.textContent=text;
-    msgEl.style.color=type==='good'?'var(--ok)':type==='bad'?'var(--bad)':'#111';
-  }
+    function checkOneInput(inp){
+      const idx = Number(inp.dataset.index);
+      if (Number.isNaN(idx)) return;
 
-  function revealAnswers(){
-    const {values,blankIndexes}=game.getState();
-    blankIndexes.forEach(idx=>{
-      const cell=gridEl.children[idx];
-      const inp=cell.querySelector('input');
-      if(inp){clearTimer(inp);inp.value=values[idx];inp.readOnly=true;inp.tabIndex=-1;
-        cell.classList.remove('blank','wrong');cell.classList.add('ok');}
+      const { correct, correctValue, justSolved } = game.check(idx, inp.value);
+      const cell = inp.parentElement;
+      cell.classList.remove('ok','wrong');
+
+      if (correct) {
+        cell.classList.add('ok');
+        inp.value = String(correctValue);
+        inp.readOnly = true; inp.tabIndex = -1;
+        cell.classList.remove('blank');
+
+        if (justSolved) {
+          // Decrement pending blanks exactly once per cell
+          pendingBlanks = Math.max(0, pendingBlanks - 1);
+        }
+
+        announce('Great! ✅','good');
+
+        // Advance immediately when the last blank is solved
+        if (pendingBlanks === 0) {
+          advanceRoundNow();
+        }
+      } else {
+        if (String(inp.value).trim().length > 0) {
+          cell.classList.add('wrong');
+          announce('Keep trying!','bad');
+        } else {
+          announce('');
+        }
+      }
+    }
+
+    function renderGrid(){
+      const { values, blankIndexes, correctMap, table } = game.getState();
+      gridEl.innerHTML = '';
+
+      for (let i = 0; i < values.length; i++) {
+        const cell = document.createElement('div'); cell.className = 'cell';
+
+        // left label “n × table =”
+        const label = document.createElement('span');
+        label.className = 'label';
+        label.textContent = `${i+1} × ${table} =`;
+        cell.appendChild(label);
+
+        const inp = document.createElement('input');
+        inp.type = 'tel'; inp.inputMode = 'numeric'; inp.autocomplete = 'one-time-code';
+
+        if (blankIndexes.has(i)) {
+          cell.classList.add('blank');
+          inp.value = ''; inp.placeholder='?'; inp.dataset.index = String(i);
+
+          inp.addEventListener('input', ()=> scheduleCheckForInput(inp));
+          inp.addEventListener('keydown', (e)=>{ if (e.key === 'Enter'){ e.preventDefault(); clearTimer(inp); checkOneInput(inp); }});
+          inp.addEventListener('blur', ()=>{ clearTimer(inp); if (!inp.readOnly && inp.value.trim()!=='') checkOneInput(inp); });
+
+          if (!gridEl.querySelector('.blank input')) {
+            setTimeout(()=> inp.focus({ preventScroll:true }), 0);
+          }
+        } else {
+          cell.classList.add('readonly');
+          inp.value = String(values[i]); inp.readOnly = true; inp.tabIndex = -1;
+        }
+
+        const status = correctMap.get(i);
+        if (status === true) cell.classList.add('ok');
+        if (status === false) cell.classList.add('wrong');
+
+        cell.appendChild(inp);
+        gridEl.appendChild(cell);
+      }
+    }
+
+    function announce(text,type){
+      if (!msgEl) return;
+      msgEl.textContent = text;
+      msgEl.style.color = type==='good' ? 'var(--ok)' : type==='bad' ? 'var(--bad)' : '#111';
+    }
+
+    function revealAnswers(){
+      const { values, blankIndexes } = game.getState();
+      blankIndexes.forEach(idx=>{
+        const cell = gridEl.children[idx];
+        const inp = cell.querySelector('input');
+        if (inp){
+          clearTimer(inp);
+          inp.value = values[idx];
+          inp.readOnly = true; inp.tabIndex = -1;
+          cell.classList.remove('blank','wrong');
+          cell.classList.add('ok');
+        }
+      });
+      announce('Shown the answers.','good');
+      // No auto-advance on reveal (by design)
+    }
+
+    function on(el,evt,fn){ if (el) el.addEventListener(evt,fn); }
+    on(tableSelect,'change', ()=>{
+      game.setTable(Number(tableSelect.value));
+      game.newRound();
+      startNewRoundUI();
+      announce('');
     });
-    announce('Shown the answers.','good');
-  }
+    on(newBtn,'click', ()=>{
+      game.newRound();
+      startNewRoundUI();
+      announce('');
+    });
+    on(revealBtn,'click', revealAnswers);
 
-  function on(el,evt,fn){if(el)el.addEventListener(evt,fn);}
-  on(tableSelect,'change',()=>{game.setTable(Number(tableSelect.value));game.newRound();renderGrid();announce('');});
-  on(newBtn,'click',()=>{game.newRound();renderGrid();announce('');});
-  on(revealBtn,'click',revealAnswers);
-
-  renderGrid();
-  updateScore();
-</script>
+    // init
+    startNewRoundUI();
+    updateScore();
+  </script>
 </body>
 </html>
 

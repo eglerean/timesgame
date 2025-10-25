@@ -1,5 +1,5 @@
 // game.js
-// Pure game logic for a 5x2 times-table guessing game with scoring
+// Logic for a 5x2 times-table game with level-based scoring (+1 per completed round)
 // and dynamic difficulty (more blanks as the score increases).
 
 export class TimesTableGame {
@@ -7,7 +7,7 @@ export class TimesTableGame {
     this.rows = rows;
     this.cols = cols;
     this.total = rows * cols;
-    this.score = 0; // cumulative correct answers across rounds
+    this.score = 0; // increments only when a round is fully completed
     this.setTable(table);
     this.newRound();
   }
@@ -39,18 +39,19 @@ export class TimesTableGame {
 
   newRound() {
     this.blanksCount = this.computeBlanksCount();
-    this.blankIndexes = this.#pickBlankIndexes(this.blanksCount); // Set<number>
+    this.blankIndexes = this.#pickBlankIndexes(this.blanksCount);
     this.correctMap = new Map();
     for (let i = 0; i < this.total; i++) this.correctMap.set(i, null);
+    this.roundCompleted = false;
   }
 
   isBlank(index) { return this.blankIndexes.has(index); }
   getValue(index) { return this.values[index]; }
 
   /**
-   * Check user's input for the given cell index.
-   * Increments score ONLY if this cell becomes correct for the first time.
-   * @returns {{correct: boolean, correctValue: number, scored: boolean, score: number}}
+   * Check a user's input for a given cell index.
+   * Returns whether it's correct and whether this cell just transitioned to solved.
+   * Scoring is handled at round completion by the UI via completeRound().
    */
   check(index, input) {
     const correctValue = this.getValue(index);
@@ -58,19 +59,18 @@ export class TimesTableGame {
     const ok = !Number.isNaN(userNum) && userNum === correctValue;
 
     const prev = this.correctMap.get(index);
-    let scored = false;
+    let justSolved = false;
 
     if (ok) {
       if (prev !== true) {
         this.correctMap.set(index, true);
-        this.score += 1;     // rights only
-        scored = true;
+        justSolved = true;
       }
     } else {
-      this.correctMap.set(index, false); // track wrong, no penalty
+      this.correctMap.set(index, false);
     }
 
-    return { correct: ok, correctValue, scored, score: this.score };
+    return { correct: ok, correctValue, justSolved };
   }
 
   isRoundComplete() {
@@ -78,6 +78,14 @@ export class TimesTableGame {
       if (this.correctMap.get(idx) !== true) return false;
     }
     return true;
+  }
+
+  completeRound() {
+    if (!this.roundCompleted) {
+      this.score += 1;
+      this.roundCompleted = true;
+    }
+    return this.score;
   }
 
   resetScore() { this.score = 0; }
@@ -93,6 +101,7 @@ export class TimesTableGame {
       correctMap: new Map(this.correctMap),
       score: this.score,
       blanksCount: this.blanksCount,
+      roundCompleted: this.roundCompleted,
     };
   }
 }
