@@ -1,7 +1,20 @@
 :root {
+  /* layout params */
+  --rows: 5;
+  --cols: 2;
   --gap: 12px;
-  --cell-h: 80px; /* updated dynamically by JS */
-  --aspect: 4;    /* width = 3 × height */
+  --pad: 16px;     /* matches .wrap horizontal padding */
+  --aspect: 4;     /* width = 3 × height */
+
+  /* compute cell height purely in CSS (no JS):
+     - vertical limit: half of the *dynamic* viewport height (accounts for iOS UI changes)
+     - horizontal limit: make two cells + one gap fit the viewport width inside padding
+     - choose the smaller of the two, then clamp to sensible min/max
+  */
+  --h-by-viewport: calc((50dvh - (var(--rows) - 1) * var(--gap)) / var(--rows));
+  --h-by-width:    calc((100vw - var(--pad) * 2 - (var(--cols) - 1) * var(--gap)) / var(--cols) / var(--aspect));
+  --cell-h: clamp(56px, min(var(--h-by-viewport), var(--h-by-width)), 120px);
+
   --accent: #4f7cff;
   --ok: #21a179;
   --bad: #e74c3c;
@@ -20,7 +33,7 @@ body {
 .wrap {
   max-width: 640px;
   margin: 0 auto;
-  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  padding: 12px var(--pad) calc(12px + env(safe-area-inset-bottom));
 }
 
 /* header and controls */
@@ -63,34 +76,35 @@ button.primary {
   font-weight: 700;
 }
 
-/* grid layout */
+/* grid layout (fixed by CSS only) */
 .grid {
-  width: 100%;
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  justify-content: center;
+  grid-template-columns: repeat(var(--cols), max-content);
   gap: var(--gap);
   margin: 6px auto 10px;
+  justify-content: center;
   touch-action: manipulation;
 }
 
-/* cells (rectangular, no rounded corners) */
+/* cells: rectangles (no rounded corners), sized by CSS only */
 .cell {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-radius: 0;
+  border-radius: 0; /* flat corners */
   background: #fff;
   border: 2px solid #e6e8ee;
   box-shadow: 0 1px 0 rgba(0,0,0,0.04);
   overflow: hidden;
   transition: border-color 120ms ease, outline-color 120ms ease;
-  aspect-ratio: var(--aspect);
+
+  /* fixed sizing: width = 3 × height, all via CSS */
   height: var(--cell-h);
+  width: calc(var(--cell-h) * var(--aspect));
   padding: 0 8px;
 }
 
-/* operation label */
+/* operation label on the left */
 .cell .label {
   flex: 0 0 auto;
   font-size: clamp(10px, 3vw, 14px);
@@ -98,7 +112,6 @@ button.primary {
   font-weight: 600;
   white-space: nowrap;
   margin-right: 6px;
-  position: absolute;
 }
 
 /* input stretches to fill remaining width */
@@ -107,8 +120,7 @@ button.primary {
   height: 100%;
   border: none;
   outline: none;
-  text-align: left;
-  margin-left:75px;
+  text-align: center;
   font-weight: 800;
   font-size: clamp(18px, 5vw, 28px);
   background: transparent;
