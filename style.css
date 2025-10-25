@@ -1,7 +1,7 @@
 :root {
   --gap: 12px;
-  --cell-h: 64px; /* updated dynamically by JS */
-  --aspect: 3;    /* width = 3 × height */
+  --cell-h: 80px; /* updated dynamically by JS */
+  --aspect: 4;    /* width = 3 × height */
   --accent: #4f7cff;
   --ok: #21a179;
   --bad: #e74c3c;
@@ -107,7 +107,8 @@ button.primary {
   height: 100%;
   border: none;
   outline: none;
-  text-align: center;
+  text-align: left;
+  margin-left:75px;
   font-weight: 800;
   font-size: clamp(18px, 5vw, 28px);
   background: transparent;
